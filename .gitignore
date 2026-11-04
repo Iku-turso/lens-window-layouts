@@ -1,0 +1,8 @@
+dist/
+node_modules/
+.claude/skills/lens-*/
+.agents/skills/lens-*/
+.claude/settings.json
+.test-build/
+.claude/settings.local.json
+tsconfig.tsbuildinfo

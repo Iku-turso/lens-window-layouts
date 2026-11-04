@@ -1,0 +1,58 @@
+{
+  "name": "@k8slens/window-layouts",
+  "version": "0.1.0",
+  "description": "Save named window layouts of Lens: where every window sits and how it shows, and recall them at will.",
+  "keywords": [
+    "lens-extension"
+  ],
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "files": [
+    "dist",
+    "assets",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "lensExtension": {
+    "icon": "assets/icon.svg",
+    "banner": "assets/banner.svg"
+  },
+  "scripts": {
+    "build": "lens-types-check && lens-extension-dependencies-check && lens-package-build --entry-point ./src/index.ts",
+    "clean": "rimraf dist/",
+    "test": "tsc -p test && esbuild test/*.test.ts --bundle --platform=node --format=cjs --outdir=.test-build --log-level=warning && node --test .test-build/*.test.js"
+  },
+  "dependencies": {
+    "@k8slens/cluster-contracts": "^2.6.0",
+    "@k8slens/command-palette-contracts": "^1.1.0",
+    "@k8slens/drop-down-menu-contracts": "^2.3.2",
+    "@k8slens/drop-down-menu-items": "^1.1.5",
+    "@k8slens/element-components": "^3.9.2",
+    "@k8slens/feature-core": "^7.5.2",
+    "@k8slens/icon": "^4.3.0",
+    "@k8slens/injectable": "^26.2.2",
+    "@k8slens/input-components": "^1.0.1",
+    "@k8slens/kubernetes-resources-contracts": "^1.4.0",
+    "@k8slens/messaging-contracts": "^1.0.1",
+    "@k8slens/modal-components": "^1.2.1",
+    "@k8slens/modal-contracts": "^1.0.2",
+    "@k8slens/navigation-contracts": "^1.3.0",
+    "@k8slens/persistable-contracts": "^1.0.3",
+    "@k8slens/place-sub-window-contracts": "^1.0.0",
+    "@k8slens/preferences-contracts": "^2.0.2",
+    "@k8slens/status-bar-contracts": "^1.0.2",
+    "@k8slens/stylesheet-contracts": "^1.0.0",
+    "@k8slens/sub-window-contracts": "^1.3.0",
+    "@k8slens/use-inject": "^1.0.2",
+    "@k8slens/window-layout-contracts": "^1.1.0",
+    "mobx": "^6.15.0",
+    "mobx-react": "^9.2.1",
+    "react": "^19.2.0"
+  },
+  "devDependencies": {
+    "@k8slens/package-build": "^3.1.0",
+    "@k8slens/typescript": "^8.0.0",
+    "@types/react": "^19.2.0",
+    "rimraf": "^4.4.1"
+  }
+}
