@@ -2,6 +2,11 @@
   "name": "@k8slens/window-layouts",
   "version": "0.1.0",
   "description": "Save named window layouts of Lens: where every window sits and how it shows, and recall them at will.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Iku-turso/lens-window-layouts.git"
+  },
   "keywords": [
     "lens-extension"
   ],
