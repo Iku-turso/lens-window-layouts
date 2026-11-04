@@ -1,0 +1,15 @@
+// A button that is an icon alone, as the trash can deleting a layout.
+.window-manager-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(127, 127, 127, 0.2);
+  }
+}

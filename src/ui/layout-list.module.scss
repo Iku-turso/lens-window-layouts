@@ -1,0 +1,68 @@
+// The layouts as one box of rows, divided by lines, as Lens's choice of AI tool lists the tools.
+.list {
+  box-sizing: border-box;
+  max-height: 100%;
+  overflow: auto;
+}
+
+.row {
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+  outline: none;
+
+  // The line between rows, in the colour of the box's border.
+  & + & {
+    border-top: 1px solid;
+    border-top-color: inherit;
+  }
+
+  &:hover,
+  &:focus-visible {
+    background: rgba(127, 127, 127, 0.08);
+  }
+}
+
+.selected,
+.selected:hover {
+  background: rgba(127, 127, 127, 0.14);
+}
+
+// Marks the layout selected, down the left of its row.
+.marker {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+}
+
+// The layout's name, shortened to fit, and the button recalling it at the row's right end.
+.nameLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Shown while the pointer is on the row, or the button has the keyboard's focus.
+.recall {
+  flex-shrink: 0;
+  opacity: 0;
+
+  &:focus-visible {
+    opacity: 1;
+  }
+}
+
+.row:hover .recall {
+  opacity: 1;
+}

@@ -1,0 +1,413 @@
+// A height of its own, not following the width, so a scrollbar coming and going cannot resize it.
+.drawing {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  // As tall as the dialog has room for, and as tall as this at the least, the dialog scrolling then.
+  flex: 1 1 0;
+  min-height: 300px;
+}
+
+.screens {
+  position: relative;
+  user-select: none;
+}
+
+.cell {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px dashed rgba(127, 127, 127, 0.3);
+  pointer-events: none;
+}
+
+// An empty cell, clickable: a plus shows while the pointer is over it.
+.emptyCell {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+
+  .plus {
+    display: inline-flex;
+    position: relative;
+    z-index: 1;
+    padding: 4px;
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity 120ms ease;
+  }
+
+  &:hover,
+  &:focus-visible {
+    background: rgba(127, 127, 127, 0.12);
+
+    .plus {
+      opacity: 1;
+    }
+  }
+}
+
+.stepperGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+// A screen's steppers, over its tiles, where the screen is.
+.screenControls {
+  position: absolute;
+  // As the screen's border, for the pills to be placed on the grid as the screen's cells are.
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  z-index: 1;
+  pointer-events: none;
+}
+
+// A stepper in a pill centred on the edge of the grid it sizes.
+.pill {
+  position: absolute;
+  display: flex;
+  box-sizing: border-box;
+  pointer-events: auto;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
+}
+
+.columnsPill {
+  left: 50%;
+  padding: 2px 8px;
+}
+
+.rowsPill {
+  left: 0;
+  padding: 8px 2px;
+}
+
+.screen {
+  position: absolute;
+  box-sizing: border-box;
+}
+
+.band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 40px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  padding: 6px 12px;
+  overflow: hidden;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.screenName {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+// In the screen's top right corner, at the end of its name's line.
+.untile {
+  flex-shrink: 0;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 120ms ease;
+
+  &.shown,
+  &:focus-visible {
+    opacity: 1;
+  }
+}
+
+.verticalStepperGroup {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.stepper {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 4px;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+
+  &:hover:not(:disabled) {
+    background: rgba(127, 127, 127, 0.25);
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.4;
+    // Hovered through, for its wrapper's tooltip to tell why.
+    pointer-events: none;
+  }
+}
+
+.stepperTip {
+  display: inline-flex;
+}
+
+// The stepper's name, centred between its buttons on its centre line: its box trimmed to the top
+// of its capitals and its baseline, so that those, not the room for accents and descenders, are
+// what is centred.
+.label {
+  display: block;
+  line-height: 1;
+  text-box: trim-both cap alphabetic;
+  white-space: nowrap;
+}
+
+// Read along the side, bottom to top.
+.verticalLabel {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+.tile {
+  position: absolute;
+  box-sizing: border-box;
+  padding: 2px;
+  cursor: grab;
+  touch-action: none;
+  transition:
+    left 120ms ease,
+    top 120ms ease,
+    width 120ms ease,
+    height 120ms ease;
+}
+
+.tileBody {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  // Clear of the pills on the grid's left and top edges, half of each of which lies over the grid.
+  padding: 18px 6px 4px 18px;
+}
+
+.tileTitleLine {
+  // Clear of the cross closing the window.
+  padding-right: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 6px;
+  white-space: nowrap;
+
+  > :not(:first-child) {
+    flex-shrink: 0;
+  }
+}
+
+// The window's name and its pen, together on the first line, the name shortened only where it
+// alone is wider than the tile.
+.tileName {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+// Told of the window after its name, as "not open" with its button: kept whole, moving to the next
+// line rather than squeezing the name.
+.tileLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tileTitle {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dragging {
+  cursor: grabbing;
+  opacity: 0.6;
+}
+
+.handle {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  background: linear-gradient(
+    135deg,
+    transparent 50%,
+    currentColor 50%,
+    currentColor 60%,
+    transparent 60%,
+    transparent 70%,
+    currentColor 70%,
+    currentColor 80%,
+    transparent 80%
+  );
+  opacity: 0.7;
+}
+
+.tray {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  user-select: none;
+}
+
+// A window not tiled: its name, shortened to fit, and what it shows next to it on one line.
+.chip {
+  display: inline-flex;
+  align-items: center;
+  cursor: grab;
+  touch-action: none;
+  padding: 2px 8px;
+  max-width: 220px;
+  overflow: hidden;
+  white-space: nowrap;
+
+  position: relative;
+
+  .tileTitle {
+    flex: 0 1 auto;
+  }
+
+  // Its buttons after its name, their room kept while hidden, so that nothing moves as they show.
+  .closeWindowInline {
+    flex-shrink: 0;
+    margin-left: 2px;
+  }
+}
+
+.ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 10000;
+  padding: 2px 8px;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transform: translate(8px, 8px);
+}
+
+// The cross closing a window, at the top right of its tile, shown while the tile is pointed at.
+.closeWindow {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0;
+
+  &:hover {
+    background: rgba(127, 127, 127, 0.25);
+  }
+
+  &:focus-visible {
+    opacity: 1;
+  }
+}
+
+.tile:hover .closeWindow,
+.chip:hover .closeWindow {
+  opacity: 1;
+}
+
+// Right after the window's name, shown while the pointer is on its tile or chip; its room kept
+// meanwhile, so that nothing moves as it shows.
+.renameWindow {
+  flex-shrink: 0;
+  // Level with the middle of the name, not sat on its baseline as the line's text is.
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 2px;
+  padding: 1px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0;
+
+  &:hover {
+    background: rgba(127, 127, 127, 0.25);
+  }
+
+  &:focus-visible {
+    opacity: 1;
+  }
+}
+
+.tile:hover .renameWindow,
+.chip:hover .renameWindow {
+  opacity: 1;
+}
+
+// Opening the window not open again, after "not open".
+.reopenWindow {
+  flex-shrink: 0;
+  align-self: center;
+  // Shown while the pointer is on its tile or chip, its room kept meanwhile, as the pen is.
+  opacity: 0;
+
+  &:focus-visible {
+    opacity: 1;
+  }
+}
+
+.tile:hover .reopenWindow,
+.chip:hover .reopenWindow {
+  opacity: 1;
+}
+
+// The window's name being typed, as wide as the tile lets it be.
+.tileTitleForm {
+  flex: 1 1 auto;
+  min-width: 0;
+
+  input {
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+// In a chip of the windows not tiled, after its name.
+.closeWindowInline {
+  position: static;
+  margin-left: 4px;
+  vertical-align: middle;
+}
