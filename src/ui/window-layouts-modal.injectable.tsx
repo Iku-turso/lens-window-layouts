@@ -22,6 +22,7 @@ import {
   IconButton,
   EditIcon,
   HistoryIcon,
+  PushPinIcon,
   SaveIcon,
   SplitViewIcon,
 } from "@k8slens/icon";
@@ -273,6 +274,29 @@ const LayoutList = observer(() => {
   );
 });
 
+// Pins the layout to the hotbar, to recall it from there, or takes it off.
+const PinToHotbar = observer(({ name }: { name: string }) => {
+  const model = useInject(windowLayoutsModelInjectable)();
+  const isPinned = model.isPinned(name).get();
+
+  return (
+    <button
+      type="button"
+      className="window-manager-icon-button"
+      aria-label={isPinned ? `Unpin ${name} from the hotbar` : `Pin ${name} to the hotbar`}
+      aria-pressed={isPinned}
+      title={
+        isPinned
+          ? "Unpin from the hotbar"
+          : "Pin to the hotbar, to recall this layout from there"
+      }
+      onClick={() => void model.togglePinned(name)}
+    >
+      <PushPinIcon $size="l" $color={isPinned ? "primary" : "textMuted"} />
+    </button>
+  );
+});
+
 // The top of the right panel: the layout selected, and what can be done with it.
 const SelectedLayout = observer(() => {
   const model = useInject(windowLayoutsModelInjectable)();
@@ -293,6 +317,10 @@ const SelectedLayout = observer(() => {
           }}
         >
           <LayoutName name={layout.name} />
+
+          {model.renaming.get() !== layout.name && (
+            <PinToHotbar name={layout.name} />
+          )}
 
           {model.renaming.get() !== layout.name && (
             <button

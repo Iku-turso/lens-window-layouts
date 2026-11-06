@@ -34,6 +34,7 @@ Arranging windows needs Lens Studio. Without it, the extension tells you that la
 - To save a new layout: click **+** next to **Layouts**.
 - To save over a layout: select it, then click its **Save**. It saves where the windows are now and the tiling below.
 - To recall: point at a layout in the list, then click the recall button at the right end of its row.
+- To recall from the hotbar: select a layout and click the pin beside its name. The layout shows in the hotbar by its initials; click it to recall the layout, or click the pin again, or right-click the item and choose "Remove from hotbar", to take it off.
 - To rename: select a layout, click its name, type the new name and press Enter.
 - To delete: select a layout, then click **Delete**.
 - To tile: arrange the windows under **Tiling** in the dialog. They follow every change you make there, a moment after it. **Window Layouts: Tile windows** in the command palette tiles them as arranged too.

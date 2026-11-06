@@ -20,6 +20,12 @@ import {
 } from "@k8slens/persistable-contracts";
 import { allClusterRecordsReactiveInjectionToken } from "@k8slens/cluster-contracts";
 import {
+  addToHotbarInjectionToken,
+  isInHotbarInjectionToken,
+  isInHotbarReactiveInjectionToken,
+  removeFromHotbarInjectionToken,
+} from "@k8slens/hotbar-contracts";
+import {
   closeAnySubWindowInjectionToken,
   openSubWindowInjectionToken,
   renameAnySubWindowInjectionToken,
@@ -75,6 +81,10 @@ import {
   windowLineageBunch,
 } from "../src/layouts/window-lineage.injectable";
 import { windowReopeningsBunch } from "../src/layouts/window-reopenings.injectable";
+import {
+  layoutHotbarItemKind,
+  layoutInHotbarInjectable,
+} from "../src/layouts/layout-in-hotbar.injectable";
 import { deleteLayoutModalKind } from "../src/ui/delete-layout-modal.injectable";
 import { windowLayoutsModelInjectable } from "../src/ui/window-layouts-model.injectable";
 import { disposeWindowLayoutsModelInjectable } from "../src/ui/window-layouts-model.purge.injectable";
@@ -136,6 +146,8 @@ export const createFakeLens = (persisted: Record<string, unknown> = {}) => {
   // The places whose opening has settled, by the id each was opened as.
   const placesSettled = observable.set<string>();
   let places = 0;
+  // The layouts pinned to the hotbar's page, by the ids of their items, in the order pinned.
+  const hotbar = observable.array<string>([], { deep: false });
 
   const addWindow = (
     window: WindowId,
@@ -219,6 +231,7 @@ export const createFakeLens = (persisted: Record<string, unknown> = {}) => {
     calls,
     closedDescriptions,
     persistedStates,
+    hotbar,
     addWindow,
     closeWindow,
     // Told as Lens is asked to focus a window, as a recall does once it has opened windows again
@@ -433,6 +446,49 @@ export const createFakeLens = (persisted: Record<string, unknown> = {}) => {
             );
           },
         }),
+        // The hotbar, as it answers for items of the extension's kind.
+        getInjectable2({
+          id: "fake-add-to-hotbar",
+          injectionToken: ({ scopeIds }) =>
+            addToHotbarInjectionToken.for(layoutHotbarItemKind).for(scopeIds),
+          instantiate: () => () => async ({ id }: { id: string }) => {
+            if (hotbar.includes(id)) {
+              throw new Error(`"${id}" is in the hotbar already.`);
+            }
+
+            runInAction(() => hotbar.push(id));
+          },
+        }),
+        getInjectable2({
+          id: "fake-is-in-hotbar",
+          injectionToken: ({ scopeIds }) =>
+            isInHotbarInjectionToken.for(layoutHotbarItemKind).for(scopeIds),
+          instantiate: () => () => async (id: string) => hotbar.includes(id),
+        }),
+        getInjectable2({
+          id: "fake-is-in-hotbar-reactive",
+          injectionToken: ({ scopeIds }) =>
+            isInHotbarReactiveInjectionToken
+              .for(layoutHotbarItemKind)
+              .for(scopeIds),
+          instantiate: () => (id: string) =>
+            computed(() => hotbar.includes(id)),
+        }),
+        getInjectable2({
+          id: "fake-remove-from-hotbar",
+          injectionToken: ({ scopeIds }) =>
+            removeFromHotbarInjectionToken
+              .for(layoutHotbarItemKind)
+              .for(scopeIds),
+          instantiate: () => () => async (id: string) => {
+            if (!hotbar.includes(id)) {
+              throw new Error(`"${id}" is not in the hotbar.`);
+            }
+
+            runInAction(() => hotbar.remove(id));
+          },
+        }),
+        layoutInHotbarInjectable,
         savedWindowLayoutsBunch,
         storedTilingPlanBunch,
         windowReopeningsBunch,

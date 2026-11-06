@@ -49,6 +49,7 @@ import {
 import { canOpenPlacesInSubWindowsReactiveInjectionToken } from "@k8slens/place-sub-window-contracts";
 import { placesSubWindowKind } from "../layouts/places-sub-window-kind.injectable";
 import { deleteWindowLayoutInjectable } from "../layouts/delete-window-layout.injectable";
+import { layoutInHotbarInjectable } from "../layouts/layout-in-hotbar.injectable";
 import { layoutTilingInjectable } from "../layouts/layout-tiling.injectable";
 import { recallWindowLayoutInjectable } from "../layouts/recall-window-layout.injectable";
 import { renameWindowLayoutInjectable } from "../layouts/rename-window-layout.injectable";
@@ -246,6 +247,7 @@ export const windowLayoutsModelInjectable = getInjectable2({
     const saveWindowLayout = di.inject(saveWindowLayoutInjectable)();
     const recallWindowLayout = di.inject(recallWindowLayoutInjectable)();
     const deleteWindowLayout = di.inject(deleteWindowLayoutInjectable)();
+    const layoutInHotbar = di.inject(layoutInHotbarInjectable)();
     const tileWindows = di.inject(tileWindowsInjectable)();
     const tilingPlan = di.inject(tilingPlanInjectable)();
     const layoutTiling = di.inject(layoutTilingInjectable)();
@@ -657,9 +659,28 @@ export const windowLayoutsModelInjectable = getInjectable2({
       tilingChanged.set(false);
     });
 
+    // Changes the hotbar, telling when it could not be: the layout is renamed or deleted anyway.
+    const followInHotbar = async (follow: () => Promise<void>) => {
+      try {
+        await follow();
+      } catch (error) {
+        runInAction(() =>
+          status.set(
+            `Could not change the hotbar: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
+      }
+    };
+
     const model = {
       layouts,
       status,
+
+      // Whether the layout is pinned to the hotbar's current page, and pinning or unpinning it.
+      isPinned: layoutInHotbar.isPinned,
+      togglePinned: (name: string) =>
+        followInHotbar(() => layoutInHotbar.toggle(name)),
+
       // Without Lens Studio Lens lists no windows, and nothing can be arranged.
       canArrange: computed(() => windows.get().length > 0),
 
@@ -809,7 +830,7 @@ export const windowLayoutsModelInjectable = getInjectable2({
         );
 
         if (!result) {
-          return;
+          return undefined;
         }
 
         showTilingOf(name);
@@ -830,13 +851,15 @@ export const windowLayoutsModelInjectable = getInjectable2({
             : []),
         ];
 
-        runInAction(() =>
-          status.set(
-            notes.length > 0
-              ? `Recalled "${name}", placing ${plural(result.placed, "window")}. Note: ${notes.join("; ")}.`
-              : undefined,
-          ),
-        );
+        const note =
+          notes.length > 0
+            ? `Recalled "${name}", placing ${plural(result.placed, "window")}. Note: ${notes.join("; ")}.`
+            : undefined;
+
+        runInAction(() => status.set(note));
+
+        // What went otherwise, for whoever recalled it from outside the dialog to tell.
+        return note;
       },
 
       renaming,
@@ -885,6 +908,10 @@ export const windowLayoutsModelInjectable = getInjectable2({
 
           status.set(undefined);
         });
+
+        if (result === "renamed") {
+          await followInHotbar(() => layoutInHotbar.renamed(from, to));
+        }
       },
 
       // The editor's edits mark the setup of the layout it shows as changed, and tile the windows so.
@@ -1222,6 +1249,8 @@ export const windowLayoutsModelInjectable = getInjectable2({
 
           status.set(undefined);
         });
+
+        await followInHotbar(() => layoutInHotbar.deleted(name));
       },
     };
 

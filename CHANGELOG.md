@@ -5,6 +5,7 @@ What changed in each version of this extension, newest first.
 ## Unreleased
 
 - Rows and columns can always be added to a screen's tiling, also past eight: a screen whose windows needed more than eight rows had both its row buttons disabled.
+- Pin a layout to the hotbar with the pin beside its name, and recall it from there in one click; the item shows the layout's initials and follows it as it is renamed or deleted. What a recall from the hotbar could not do is told in a notification.
 - Needs a Lens whose window layouts tell what a closed window was and which window they opened again (@k8slens/window-layout-contracts 1.1).
 - Windows are no longer described ahead of time, as they change: a closed window is opened again as Lens described it as it closed, asked for only when it is opened again or saved. Windows closed before this version still open again as the extension last described them.
 - A window opened again, from its tile or by Recall, is the window Lens answers with, so several opened at once each land in their own tile, even when other windows show meanwhile; a window Lens cannot open again stays shown as not open.
