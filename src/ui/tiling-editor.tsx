@@ -25,8 +25,6 @@ import { observer } from "mobx-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { nameOfScreen } from "../layouts/screens";
 import {
-  maxColumns,
-  maxRows,
   moveInPlan,
   resizeInPlan,
   setColumnsInPlan,
@@ -439,7 +437,6 @@ const Stepper = ({
   value,
   word,
   min,
-  max,
   where,
   vertical = false,
   onChange,
@@ -447,7 +444,6 @@ const Stepper = ({
   value: number;
   word: string;
   min: number;
-  max: number;
   where: string;
   vertical?: boolean;
   onChange: (value: number) => void;
@@ -472,12 +468,8 @@ const Stepper = ({
   const more = (
     <StepperButton
       label={`More ${word}s on ${where}`}
-      tooltip={
-        value < max
-          ? `Add a ${word}: ${plural(value + 1, word)}`
-          : `${plural(value, word)}: the most`
-      }
-      enabled={value < max}
+      tooltip={`Add a ${word}: ${plural(value + 1, word)}`}
+      enabled
       onClick={() => onChange(value + 1)}
     >
       <AddCircleOutlineIcon $size="m" $color="primary" />
@@ -610,7 +602,6 @@ const ScreenSteppers = observer(
             value={screen.columns}
             word="column"
             min={1}
-            max={maxColumns}
             where={name}
             onChange={(columns) =>
               model.tilingPlan.commit(
@@ -632,7 +623,6 @@ const ScreenSteppers = observer(
             value={Math.max(screen.rows, 1)}
             word="row"
             min={Math.max(screen.neededRows, 1)}
-            max={maxRows}
             where={name}
             vertical
             onChange={(rows) =>

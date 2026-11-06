@@ -48,7 +48,9 @@ export interface StoredTilingPlan {
   readonly screens?: Readonly<Record<string, StoredPlanScreen>>;
 }
 
+// The most columns a screen is given by itself, before one is chosen for it; more can be added.
 export const maxColumns = 8;
+// The most rows a window is made tall by dragging its corner, beyond those of its screen.
 export const maxRows = 8;
 
 export interface PlannedWindow {
@@ -588,15 +590,19 @@ export const resolveTilingPlan = (
     const widest = Math.max(1, ...onScreen.map((it) => it.columns));
     const storedColumns = stored?.columns[String(display.id)];
 
-    const columns = clamp(
-      storedColumns ??
-        Math.max(
-          columnsFor(onScreen.reduce((sum, it) => sum + cellsOf(it), 0) || 1),
-          widest,
-        ),
-      1,
-      maxColumns,
-    );
+    const columns =
+      storedColumns !== undefined
+        ? Math.max(storedColumns, 1)
+        : clamp(
+            Math.max(
+              columnsFor(
+                onScreen.reduce((sum, it) => sum + cellsOf(it), 0) || 1,
+              ),
+              widest,
+            ),
+            1,
+            maxColumns,
+          );
 
     const { placed, rows: neededRows } = placeInGrid(onScreen, columns);
     const storedRows = stored?.rows?.[String(display.id)] ?? 0;
@@ -605,7 +611,7 @@ export const resolveTilingPlan = (
       display,
       missing: missing.includes(display),
       columns,
-      rows: Math.max(neededRows, clamp(storedRows, 1, maxRows)),
+      rows: Math.max(neededRows, storedRows, 1),
       neededRows,
       windows: placed,
     };
@@ -802,7 +808,7 @@ export const resizeInPlan = (
               {
                 ...resized,
                 columns: clamp(columns, 1, screen.columns),
-                rows: clamp(rows, 1, maxRows),
+                rows: clamp(rows, 1, Math.max(maxRows, screen.rows)),
               },
               ...screen.windows.filter((it) => it !== resized),
             ],
@@ -820,7 +826,7 @@ export const setColumnsInPlan = (
     ...resolved,
     screens: resolved.screens.map((screen) =>
       screen.display.id === displayId
-        ? { ...screen, columns: clamp(columns, 1, maxColumns) }
+        ? { ...screen, columns: Math.max(columns, 1) }
         : screen,
     ),
   });
@@ -834,7 +840,7 @@ export const setRowsInPlan = (
     ...resolved,
     screens: resolved.screens.map((screen) =>
       screen.display.id === displayId
-        ? { ...screen, rows: clamp(rows, 1, maxRows) }
+        ? { ...screen, rows: Math.max(rows, 1) }
         : screen,
     ),
   });

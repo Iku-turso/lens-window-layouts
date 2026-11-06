@@ -6,7 +6,12 @@ import {
 } from "@k8slens/messaging-contracts";
 import type { WindowReopening } from "@k8slens/window-layout-contracts";
 import { autorun, runInAction } from "mobx";
-import { keyOfWindow, type PlannedWindow } from "../src/layouts/tiling-plan";
+import {
+  keyOfWindow,
+  setColumnsInPlan,
+  setRowsInPlan,
+  type PlannedWindow,
+} from "../src/layouts/tiling-plan";
 import { windowLayoutsModelInjectable } from "../src/ui/window-layouts-model.injectable";
 import { createFakeLens, reopeningFor, settle, subWindowId } from "./fake-lens";
 
@@ -625,4 +630,23 @@ test("a window being opened in a cell when the extension was last loaded leaves 
   );
 
   model.dispose();
+});
+
+test("a screen can be given more rows and columns than it would be given by itself, past eight", async () => {
+  const { model } = await withLayoutOf([
+    { id: "preferences", title: "Preferences" },
+  ]);
+  const displayId = model.tilingPlan.resolved.get().screens[0].display.id;
+
+  model.tilingPlan.commit(
+    setRowsInPlan(model.tilingPlan.resolved.get(), displayId, 12),
+  );
+  model.tilingPlan.commit(
+    setColumnsInPlan(model.tilingPlan.resolved.get(), displayId, 10),
+  );
+
+  const [screen] = model.tilingPlan.resolved.get().screens;
+
+  assert.equal(screen.rows, 12);
+  assert.equal(screen.columns, 10);
 });
