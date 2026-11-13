@@ -25,7 +25,15 @@ import { computed } from "mobx";
 import { placeOf } from "@k8slens/navigation-contracts";
 import { preferencesNavigationTargetKind } from "@k8slens/preferences-contracts";
 import { observer } from "mobx-react";
-import { useEffect, useMemo } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { resourceLists, type ResourceList } from "../layouts/resource-lists";
 import {
   type Cell,
@@ -132,9 +140,13 @@ const ClusterSearch = observer(() => {
   );
 });
 
+// Has the panel of a cluster's pages keep the height it shows at, as its search hides pages.
+const KeepPanelHeightContext = createContext(() => {});
+
 // Finds a cluster's pages by name.
 const PageSearch = observer(() => {
   const model = useInject(windowLayoutsModelInjectable)();
+  const keepPanelHeight = useContext(KeepPanelHeightContext);
 
   // A cluster's pages opened anew are searched anew.
   useEffect(() => model.setPageSearch(""), []);
@@ -142,7 +154,10 @@ const PageSearch = observer(() => {
   return (
     <MenuSearch
       value={model.pageSearch.get()}
-      onChange={(text) => model.setPageSearch(text)}
+      onChange={(text) => {
+        keepPanelHeight();
+        model.setPageSearch(text);
+      }}
       placeholder="Search pages"
       width={280}
     />
@@ -486,30 +501,48 @@ export const resourceListItemsBunch = getDropDownMenuItemsInjectableBunch({
   ],
 });
 
-// A cluster's pages are more than a window can be tall, and a menu taller than the room beside its
-// row is placed wherever it fits instead. Lens's own panel, half the window tall and scrolling,
-// always fits beside the row, below it or above.
+// A cluster's pages are more than a short window can be tall, and a menu taller than the room beside
+// its row is placed wherever it fits instead. So the panel is as tall as its pages, but never taller
+// than half the window, scrolling then; that always fits beside the row, below it or above.
+//
+// It keeps that height as its search hides pages: opened upwards, from its row's bottom, a panel
+// growing shorter would move its search out from under the pointer, and close. So the search, about
+// to hide pages, has the panel keep the height it shows at.
 const ResourceListMenuContainer = ({
   children,
   items: _items,
   ...menuProps
-}: DropDownMenuContainerProps) => (
-  <DefaultDropDownMenuContainer
-    {...menuProps}
-    // Of the one height as its search hides pages: opened upwards, from its row's bottom, a panel
-    // growing shorter would move its search out from under the pointer, and close. Scrolling up and
-    // down only: what reaches past the panel's sides, as the strip that keeps a pointer crossing the
-    // gap to it on it, is no reason to scroll sideways.
-    $style={{
-      height: "50vh",
-      boxSizing: "border-box",
-      overflowY: "auto",
-      overflowX: "hidden",
-    }}
-  >
-    {children}
-  </DefaultDropDownMenuContainer>
-);
+}: DropDownMenuContainerProps) => {
+  const [height, setHeight] = useState<number>();
+  const mark = useRef<HTMLSpanElement>(null);
+
+  const keepHeight = useCallback(() => {
+    const panel = mark.current?.parentElement;
+
+    if (panel) {
+      setHeight((kept) => kept ?? panel.getBoundingClientRect().height);
+    }
+  }, []);
+
+  return (
+    <DefaultDropDownMenuContainer
+      {...menuProps}
+      // Scrolling up and down only: what reaches past the panel's sides, as the strip that keeps a
+      // pointer crossing the gap to it on it, is no reason to scroll sideways.
+      $style={{
+        ...(height === undefined ? { maxHeight: "50vh" } : { height }),
+        boxSizing: "border-box",
+        overflowY: "auto",
+        overflowX: "hidden",
+      }}
+    >
+      <span ref={mark} hidden />
+      <KeepPanelHeightContext.Provider value={keepHeight}>
+        {children}
+      </KeepPanelHeightContext.Provider>
+    </DefaultDropDownMenuContainer>
+  );
+};
 
 export const resourceListMenuContainerInjectable = getInjectable2({
   id: "window-manager-resource-list-menu-container",

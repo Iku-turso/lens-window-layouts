@@ -4,6 +4,7 @@ What changed in each version of this extension, newest first.
 
 ## 0.2.1
 
+- A cluster's pages, in the menu of an empty cell, are as tall as the pages are, rather than half the window with room left empty below them; past half the window, they scroll as before.
 - The extension has an icon and a banner of its own, and its README shows the Window layouts dialog and the hotbar preview.
 
 ## 0.2.0
