@@ -2,6 +2,10 @@
 
 What changed in each version of this extension, newest first.
 
+## 0.2.2
+
+- A screen's grid is outlined dashed only where it is empty: the cells under a tile were outlined too, which showed as a dashed ring around every tile and a double line between tiles side by side.
+
 ## 0.2.1
 
 - A cluster's pages, in the menu of an empty cell, are as tall as the pages are, rather than half the window with room left empty below them; past half the window, they scroll as before.
