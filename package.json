@@ -1,12 +1,17 @@
 {
   "name": "@k8slens/window-layouts",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Save named window layouts of Lens: where every window sits and how it shows, and recall them at will.",
+  "author": "Iku-turso",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Iku-turso/lens-window-layouts.git"
   },
+  "bugs": {
+    "url": "https://github.com/Iku-turso/lens-window-layouts/issues"
+  },
+  "homepage": "https://github.com/Iku-turso/lens-window-layouts#readme",
   "keywords": [
     "lens-extension"
   ],
@@ -25,7 +30,8 @@
   "scripts": {
     "build": "lens-types-check && lens-extension-dependencies-check && lens-package-build --entry-point ./src/index.ts",
     "clean": "rimraf dist/",
-    "test": "tsc -p test && esbuild test/*.test.ts --bundle --platform=node --format=cjs --outdir=.test-build --log-level=warning && node --test .test-build/*.test.js"
+    "test": "tsc -p test && esbuild test/*.test.ts --bundle --platform=node --format=cjs --outdir=.test-build --log-level=warning && node --test .test-build/*.test.js",
+    "prepublishOnly": "npm run build && lens-extension-publish-check"
   },
   "dependencies": {
     "@k8slens/cluster-contracts": "^2.6.0",
@@ -57,7 +63,7 @@
     "react": "^19.2.0"
   },
   "devDependencies": {
-    "@k8slens/package-build": "^3.1.0",
+    "@k8slens/package-build": "^3.4.0",
     "@k8slens/typescript": "^8.0.0",
     "@types/react": "^19.2.0",
     "rimraf": "^4.4.1"
