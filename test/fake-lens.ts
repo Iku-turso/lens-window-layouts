@@ -133,6 +133,8 @@ export const createFakeLens = (persisted: Record<string, unknown> = {}) => {
     }[],
     focusWindow: [] as WindowId[],
     setWindowBounds: 0,
+    // Every window placed, and where, in the order asked.
+    placements: [] as { window: WindowId; bounds: WindowBounds }[],
   };
   // What Lens described each window as as it closed, by its key.
   const closedDescriptions = new Map<string, WindowReopening>();
@@ -319,9 +321,23 @@ export const createFakeLens = (persisted: Record<string, unknown> = {}) => {
       injectionToken: displayRecordsReactiveInjectionToken,
       instantiate: () => () => computed(() => [display]),
     }),
-    fake("set-window-bounds", setWindowBoundsInjectionToken, async () => {
-      calls.setWindowBounds++;
-    }),
+    fake(
+      "set-window-bounds",
+      setWindowBoundsInjectionToken,
+      async (placements: readonly { window: WindowId; bounds: WindowBounds }[]) => {
+        calls.setWindowBounds++;
+        calls.placements.push(...placements);
+
+        // Moved where asked, as Lens moves them.
+        runInAction(() => {
+          for (const { window, bounds } of placements) {
+            windows
+              .find((it) => keyOfWindow(it.record.window) === keyOfWindow(window))
+              ?.bounds.set(bounds);
+          }
+        });
+      },
+    ),
     fake("set-window-state", setWindowStateInjectionToken, async () => {}),
     fake(
       "focus-window",

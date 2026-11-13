@@ -4,28 +4,37 @@ import {
   type HotbarItemProps,
 } from "@k8slens/hotbar-contracts";
 import { DashboardIcon } from "@k8slens/icon";
+import { dropDownMenu } from "@k8slens/drop-down-menu-contracts";
 import { getInjectable2 } from "@k8slens/injectable";
-import { showInfoNotificationInjectionToken } from "@k8slens/notifications-contracts";
 import { useInject } from "@k8slens/use-inject";
 import { observer } from "mobx-react";
 import { layoutHotbarItemKind } from "../layouts/layout-in-hotbar.injectable";
+import { layoutHotbarMenuKind } from "./layout-hotbar-menu.injectable";
+import { recallFromHotbarInjectable } from "./recall-from-hotbar.injectable";
 import { windowLayoutsModelInjectable } from "./window-layouts-model.injectable";
 
-// Recalls a layout, telling in a notification what went otherwise, as the dialog is not open to.
-export const recallFromHotbarInjectable = getInjectable2({
-  id: "window-manager.recall-from-hotbar",
-  consumptions: [showInfoNotificationInjectionToken],
+// One menu per layout rather than one per render, so that the item is not handed a new menu to
+// open whenever it renders. Beside the item, centred on it, with a gap small enough that the
+// pointer on its way into the menu does not leave both.
+export const layoutMenuOfItemInjectable = getInjectable2({
+  id: "window-manager.layout-menu-of-item",
 
-  instantiate: (di) => {
-    const model = di.inject(windowLayoutsModelInjectable)();
-    const showInfoNotification = di.inject(showInfoNotificationInjectionToken)();
+  instantiate: () => {
+    const menus = new Map<string, ReturnType<typeof menuOf>>();
+    const menuOf = (name: string) =>
+      dropDownMenu(layoutHotbarMenuKind, {
+        data: { name },
+        openOn: "hover",
+        position: "right",
+        gap: "xxs",
+      });
 
-    return () => async (name: string) => {
-      const note = await model.recall(name);
+    return () => (name: string) => {
+      const menu = menus.get(name) ?? menuOf(name);
 
-      if (note) {
-        showInfoNotification(note);
-      }
+      menus.set(name, menu);
+
+      return menu;
     };
   },
 });
@@ -40,9 +49,12 @@ const initialsOf = (name: string) => {
 };
 
 const LayoutHotbarItem = observer(
-  ({ persistedData: { name } }: HotbarItemProps<typeof layoutHotbarItemKind>) => {
+  ({
+    persistedData: { name },
+  }: HotbarItemProps<typeof layoutHotbarItemKind>) => {
     const model = useInject(windowLayoutsModelInjectable)();
     const recall = useInject(recallFromHotbarInjectable)();
+    const menu = useInject(layoutMenuOfItemInjectable)()(name);
     const layouts = model.layouts.get();
     // Taken for there until the layouts are read.
     const exists = !layouts || layouts.some((it) => it.name === name);
@@ -50,6 +62,9 @@ const LayoutHotbarItem = observer(
     return (
       <Button
         $interactive
+        // The whole slot, so the menu opens beside the slot rather than over it.
+        $width="full"
+        $height="full"
         $enabled={exists && model.canArrange.get()}
         $flex={{
           direction: "vertical",
@@ -57,11 +72,9 @@ const LayoutHotbarItem = observer(
           horizontalAlign: "center",
         }}
         aria-label={`Recall ${name}`}
-        $tooltip={
-          exists
-            ? `Recall "${name}": put the windows back where this layout has them`
-            : `There is no layout called "${name}" any more`
-        }
+        // The layout's tiling, and recalling or editing it, as the pointer is on the item.
+        $anchor
+        $dropDownMenu={menu}
         $onClick={() => void recall(name)}
       >
         <DashboardIcon $size="l" $color={exists ? "primary" : "textMuted"} />

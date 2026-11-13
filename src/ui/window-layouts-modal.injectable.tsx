@@ -22,7 +22,7 @@ import {
   IconButton,
   EditIcon,
   HistoryIcon,
-  PushPinIcon,
+  HotbarIcon,
   SaveIcon,
   SplitViewIcon,
 } from "@k8slens/icon";
@@ -292,7 +292,7 @@ const PinToHotbar = observer(({ name }: { name: string }) => {
       }
       onClick={() => void model.togglePinned(name)}
     >
-      <PushPinIcon $size="l" $color={isPinned ? "primary" : "textMuted"} />
+      <HotbarIcon $size="l" $color={isPinned ? "primary" : "textMuted"} />
     </button>
   );
 });
@@ -350,6 +350,17 @@ const SelectedLayout = observer(() => {
           {model.savedNote.get()}
         </Span>
       )}
+
+      <PlainButton
+        $disabled={
+          !model.canArrange.get() ||
+          (model.isSelectedSaved.get() && !model.hasUntiledToLeaveOut.get())
+        }
+        $tooltip="Save the windows as they are now, and the tiling below, into this layout, leaving out the windows not tiled"
+        onClick={() => model.saveOver(layout.name, { tiledOnly: true })}
+      >
+        Save tiled only
+      </PlainButton>
 
       <PrimaryButton
         Icon={SaveIcon}

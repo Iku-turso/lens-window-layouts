@@ -2,10 +2,18 @@
 
 What changed in each version of this extension, newest first.
 
-## Unreleased
+## 0.2.0
 
+- The dialog marks a window not saved by its orange outline alone, rather than with "not saved"; a window not tiled is outlined so too, as its tile would be.
+- Renaming a window tells what it does when pointed at, and how to keep or cancel the name while typing it.
+- A window its layout tiles is as saved when it is in its tile, as Recall and Tile put it, so it is no longer marked "not saved" after a recall when it was saved elsewhere; opened again from its tile, or from the hotbar's preview, it is opened in its tile.
+- Recall puts a window its tiling places in its tile, shown normally unless saved minimized, rather than where it was when saved; windows not tiled go back where they were saved.
+- **Save tiled only** in the dialog saves the windows in a tile and the tiling, leaving the windows not tiled out of the layout; they show as not saved from then on.
+- A window not open under Not tiled says "not open" in red, as its tile does, rather than "(not open)".
+- Recall brings forward only the windows its tiling places in a tile on a screen connected now, so they end above every other window; the windows it leaves not tiled, or tiles on a screen not connected, go back to their places without being brought forward.
+- Pointing at a layout in the hotbar opens a menu showing the layout's tiling, its screens side by side as they lie, a screen not connected framed and told of as the dialog does, dashed in red with "not connected; its windows are not tiled", a window not open drawn as the dialog draws it, dashed in red with "not open" in red, and counted in red, a window not where or as saved outlined in orange, as the dialog marks one not saved; clicking a window in it brings it to the front, opening it again first when it is not open, with Recall, "Tile and save", which puts the windows in their tiles by the layout's own tiling and saves them so, a window it has no tile for saved as not tiled, and "Edit in Window layouts", which opens the dialog with the layout selected.
 - Rows and columns can always be added to a screen's tiling, also past eight: a screen whose windows needed more than eight rows had both its row buttons disabled.
-- Pin a layout to the hotbar with the pin beside its name, and recall it from there in one click; the item shows the layout's initials and follows it as it is renamed or deleted. What a recall from the hotbar could not do is told in a notification.
+- Pin a layout to the hotbar with the hotbar button beside its name, and recall it from there in one click; the item shows the layout's initials and follows it as it is renamed or deleted. What a recall from the hotbar could not do is told in a notification.
 - Needs a Lens whose window layouts tell what a closed window was and which window they opened again (@k8slens/window-layout-contracts 1.1).
 - Windows are no longer described ahead of time, as they change: a closed window is opened again as Lens described it as it closed, asked for only when it is opened again or saved. Windows closed before this version still open again as the extension last described them.
 - A window opened again, from its tile or by Recall, is the window Lens answers with, so several opened at once each land in their own tile, even when other windows show meanwhile; a window Lens cannot open again stays shown as not open.

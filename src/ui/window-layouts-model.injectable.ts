@@ -56,6 +56,7 @@ import { renameWindowLayoutInjectable } from "../layouts/rename-window-layout.in
 import { duplicateWindowLayoutInjectable } from "../layouts/duplicate-window-layout.injectable";
 import { saveWindowLayoutInjectable } from "../layouts/save-window-layout.injectable";
 import { matchOpenWindows, savedWindowOfKey } from "../layouts/layout-tiling";
+import { tileBoundsOf } from "../layouts/layout-preview";
 import {
   boundsInGrid,
   keyOfWindow,
@@ -326,6 +327,21 @@ export const windowLayoutsModelInjectable = getInjectable2({
       },
     );
 
+    // The open windows of a layout, by the windows it saved: the window itself, or one opened again as
+    // it. Found by lineage alone, as for the layout shown.
+    const openWindowsOf = (layout: SavedWindowLayout) =>
+      matchOpenWindows(
+        layout.windows,
+        windows.get().map((record) => ({
+          record,
+          reopening: undefined,
+          standsFor: lineage
+            .get()
+            ?.get(lineageKey(layout.name, keyOfWindow(record.window))),
+          continues: predecessorsOfKey(keyOfWindow(record.window)),
+        })),
+      );
+
     // What the selected layout saved of each open window: the window itself, or failing that the
     // window showing what the saved one did, as one opened again under another id; each saved
     // window to one open window only.
@@ -338,17 +354,8 @@ export const windowLayoutsModelInjectable = getInjectable2({
 
       // Found by lineage alone: what an open window does is asked of Lens only when a layout is
       // shown or recalled, which keeps what it found as lineage too.
-      const open = windows.get().map((record) => ({
-        record,
-        reopening: undefined,
-        standsFor: lineage
-          .get()
-          ?.get(lineageKey(layout.name, keyOfWindow(record.window))),
-        continues: predecessorsOfKey(keyOfWindow(record.window)),
-      }));
-
       return new Map(
-        [...matchOpenWindows(layout.windows, open)].map(
+        [...openWindowsOf(layout)].map(
           ([saved, record]) => [record, saved] as const,
         ),
       );
@@ -397,18 +404,47 @@ export const windowLayoutsModelInjectable = getInjectable2({
       );
     };
 
+    // Where the selected layout's tiling puts each window it tiles on a screen connected now.
+    const selectedTileBounds = computed(() => {
+      const layout = model.selectedLayout.get();
+
+      return layout ? tileBoundsOf(layout, displays.get()) : new Map();
+    });
+
     // Whether the open window differs from what the selected layout saved of it, or is not in it.
     const isUnsaved = (record: WindowRecord) => {
       const saved = savedWindowsOf.get().get(record);
+      const layout = model.selectedLayout.get();
 
-      return !saved || !isShownAsSaved(record, saved);
+      return (
+        !saved ||
+        !isShownAsSaved(
+          record,
+          saved,
+          layout && selectedTileBounds.get().get(layout.windows.indexOf(saved)),
+        )
+      );
     };
 
-    // Where and as the layout saved it: in the same state and place; or one normal and the other
-    // maximized where the window fills just where the saved one was, as a window tiled alone on a
-    // screen fills its work area and is told maximized for it.
-    const isShownAsSaved = (record: WindowRecord, saved: SavedWindow) => {
+    // Where and as the layout saved it: a window it tiles, on a screen connected now, in its tile,
+    // shown normally or filling just its tile, as Recall and Tile put it, unless saved minimized;
+    // any other in the same state and place, or one normal and the other maximized where the
+    // window fills just where the saved one was, as a window tiled alone on a screen fills its work
+    // area and is told maximized for it.
+    const isShownAsSaved = (
+      record: WindowRecord,
+      saved: SavedWindow,
+      inTile?: WindowBounds,
+    ) => {
       const state = record.state.get();
+
+      if (inTile && saved.state !== "minimized") {
+        return (
+          (state === "normal" &&
+            isNear(record.normalBounds.get(), inTile, 2)) ||
+          (state === "maximized" && isNear(record.bounds.get(), inTile, 2))
+        );
+      }
 
       if (state === saved.state) {
         return isNear(record.normalBounds.get(), saved.normalBounds, 2);
@@ -483,9 +519,9 @@ export const windowLayoutsModelInjectable = getInjectable2({
     });
 
     // Where a window not open is created when opened again from its tile, so that it shows there
-    // from its first frame on: as the selected layout saved it while its tile is where the layout
-    // tiled it, so that it is as saved once open; otherwise over its tile on a screen connected, or
-    // else where its layout has it.
+    // from its first frame on: over its tile on a screen connected, which is as saved when its tile
+    // is where the layout tiled it, minimized too when the layout has it so; or else where its
+    // layout has it.
     const reopeningPlacementOf = (
       window: PlannedWindow,
     ): WindowReopeningPlacement | undefined => {
@@ -496,9 +532,12 @@ export const windowLayoutsModelInjectable = getInjectable2({
           (it) => keyOfWindow(it.window) === standsFor,
         ) ?? -1;
 
-      if (layout && index !== -1 && isTiledAsSaved(window, layout, index)) {
-        return savedPlacementOf(layout.windows[index]);
-      }
+      // Minimized, when the layout has it so where its tile is.
+      const minimized =
+        !!layout &&
+        index !== -1 &&
+        isTiledAsSaved(window, layout, index) &&
+        layout.windows[index].state === "minimized";
 
       const screen = tilingPlan.resolved
         .get()
@@ -517,9 +556,13 @@ export const windowLayoutsModelInjectable = getInjectable2({
             screen.rows,
             placed,
           ),
-          state: "normal",
+          state: minimized ? "minimized" : "normal",
           displayId: screen.display.id,
         };
+      }
+
+      if (layout && index !== -1 && isTiledAsSaved(window, layout, index)) {
+        return savedPlacementOf(layout.windows[index]);
       }
 
       const saved = savedWindowOf(window);
@@ -676,6 +719,33 @@ export const windowLayoutsModelInjectable = getInjectable2({
       layouts,
       status,
 
+      // The places in the layout of its windows open now but not where or as it saved them.
+      notSavedOf: (layout: SavedWindowLayout): ReadonlySet<number> => {
+        const open = openWindowsOf(layout);
+        const inTiles = tileBoundsOf(layout, displays.get());
+
+        return new Set(
+          layout.windows.flatMap((saved, index) => {
+            const record = open.get(saved);
+
+            return record && !isShownAsSaved(record, saved, inTiles.get(index))
+              ? [index]
+              : [];
+          }),
+        );
+      },
+
+      // The places in the layout of its windows not open now.
+      notOpenOf: (layout: SavedWindowLayout): ReadonlySet<number> => {
+        const open = openWindowsOf(layout);
+
+        return new Set(
+          layout.windows.flatMap((saved, index) =>
+            open.has(saved) ? [] : [index],
+          ),
+        );
+      },
+
       // Whether the layout is pinned to the hotbar's current page, and pinning or unpinning it.
       isPinned: layoutInHotbar.isPinned,
       togglePinned: (name: string) =>
@@ -685,19 +755,27 @@ export const windowLayoutsModelInjectable = getInjectable2({
       canArrange: computed(() => windows.get().length > 0),
 
       // How many screens the layout's tiling has windows on that are not connected now.
-      missingScreensOf: (layout: SavedWindowLayout) => {
+      missingScreensOf: (layout: SavedWindowLayout) =>
+        model.missingScreenIdsOf(layout).size,
+
+      // The ids of the screens the layout's tiling has windows on that are not connected now.
+      missingScreenIdsOf: (layout: SavedWindowLayout): ReadonlySet<string> => {
         const connected = new Set(displays.get().map((display) => display.id));
         const used = new Set(
           layout.tiling?.windows.map((it) => it.displayId) ?? [],
         );
 
         // A screen connected again under another id is not missing.
-        return Object.entries(layout.tiling?.screens ?? {}).filter(
-          ([id, screen]) =>
-            used.has(Number(id)) &&
-            !connected.has(Number(id)) &&
-            reconnectedIdOf(id, screen, displays.get()) === undefined,
-        ).length;
+        return new Set(
+          Object.entries(layout.tiling?.screens ?? {})
+            .filter(
+              ([id, screen]) =>
+                used.has(Number(id)) &&
+                !connected.has(Number(id)) &&
+                reconnectedIdOf(id, screen, displays.get()) === undefined,
+            )
+            .map(([id]) => id),
+        );
       },
 
       reset: action(() => {
@@ -746,8 +824,11 @@ export const windowLayoutsModelInjectable = getInjectable2({
       },
 
       // Saves the windows as they are now, and the tiling below, over the selected layout.
-      saveOver: async (name: string) => {
-        const count = await saveWindowLayout(name);
+      saveOver: async (
+        name: string,
+        options: { readonly tiledOnly?: boolean } = {},
+      ) => {
+        const count = await saveWindowLayout(name, options);
 
         runInAction(() => {
           showTilingOf(name);
@@ -756,7 +837,35 @@ export const windowLayoutsModelInjectable = getInjectable2({
           status.set(undefined);
         });
 
-        showSaved(`Saved ${plural(count, "window")} and the tiling.`);
+        showSaved(
+          options.tiledOnly
+            ? `Saved the ${plural(count, "tiled window")} and the tiling.`
+            : `Saved ${plural(count, "window")} and the tiling.`,
+        );
+
+        return count;
+      },
+
+      // Tiles the windows as the layout's tiling has them and saves them so into it, from outside
+      // the dialog, as from the hotbar: with its own tiling, loaded first unless it is the one shown,
+      // edits and all. A window the tiling has not, as one opened since, is saved as not tiled.
+      // Nothing is saved when there is no such layout, or the windows could not be tiled.
+      tileAndSaveInto: async (
+        name: string,
+      ): Promise<number | "no-layout" | "not-tiled"> => {
+        if (selected.get() !== name) {
+          await model.select(name);
+        }
+
+        if (selected.get() !== name) {
+          return "no-layout";
+        }
+
+        if (!(await model.tile())) {
+          return "not-tiled";
+        }
+
+        return model.saveOver(name);
       },
 
       // Puts the windows back where the layout has them, and tells what went otherwise, if anything.
@@ -940,6 +1049,25 @@ export const windowLayoutsModelInjectable = getInjectable2({
       // was selected, and the windows open the layout's, each where and as it was saved.
       // Whether saving would change nothing: no window out of place, open or not, and the tiling as
       // saved. A window of the layout not open is no reason to save, as saving keeps it as it was.
+      // Whether the layout shown has windows not tiled that saving only the tiled ones would leave
+      // out of it: open ones it saved, or ones not open it has still.
+      hasUntiledToLeaveOut: computed((): boolean => {
+        const layout = model.selectedLayout.get();
+
+        return (
+          !!layout &&
+          tilingPlan.resolved
+            .get()
+            .untiled.some((window) =>
+              window.missing
+                ? layout.windows.some(
+                    (it) => keyOfWindow(it.window) === standsForOf(window),
+                  )
+                : savedWindowsOf.get().has(window.record),
+            )
+        );
+      }),
+
       isSelectedSaved: computed((): boolean => {
         const layout = model.selectedLayout.get();
 
@@ -1063,10 +1191,14 @@ export const windowLayoutsModelInjectable = getInjectable2({
             acceptWhereWindowsAre();
             status.set(undefined);
           });
+
+          return true;
         } catch (error) {
           runInAction(() =>
             status.set(`Could not tile the windows: ${String(error)}`),
           );
+
+          return false;
         }
       },
 
@@ -1194,6 +1326,86 @@ export const windowLayoutsModelInjectable = getInjectable2({
         } finally {
           runInAction(() => opening.delete(key));
         }
+      },
+
+      // Brings the layout's window of the place in it to the front, opening it again first when it
+      // is not open: from its tile when the layout is the one shown, so its tile is its; otherwise
+      // as the layout kept it, where it saved it, and the window opened is the layout's from then.
+      showWindowOf: async (
+        name: string,
+        index: number,
+      ): Promise<"focused" | "opened" | "not-opened"> => {
+        const layout = layouts.get()?.find((it) => it.name === name);
+        const saved = layout?.windows[index];
+
+        if (!layout || !saved) {
+          return "not-opened";
+        }
+
+        const open = openWindowsOf(layout).get(saved);
+
+        if (open) {
+          await focusWindow(open.window);
+
+          return "focused";
+        }
+
+        if (selected.get() === name) {
+          const plan = tilingPlan.resolved.get();
+          const tile = [
+            ...plan.screens.flatMap((screen) => screen.windows),
+            ...plan.untiled,
+          ].find(
+            (it) =>
+              it.missing &&
+              (savedWindowOfKey(layout.windows, it.key) === saved ||
+                standsForOf(it) === keyOfWindow(saved.window)),
+          );
+
+          if (tile) {
+            await model.reopenWindow(tile);
+
+            return openWindowsOf(layout).has(saved) ? "opened" : "not-opened";
+          }
+        }
+
+        const reopened =
+          saved.reopening &&
+          canReopenWindowReactive(saved.reopening).get() &&
+          (await reopenWindow(saved.reopening, {
+            // In its tile, when the layout tiles it on a screen connected now, as Recall puts it.
+            bounds:
+              tileBoundsOf(layout, displays.get()).get(index) ??
+              saved.normalBounds,
+            state:
+              tileBoundsOf(layout, displays.get()).has(index) &&
+              saved.state !== "minimized"
+                ? "normal"
+                : saved.state,
+            ...(saved.displayId === undefined
+              ? {}
+              : { displayId: saved.displayId }),
+          }).catch(() => undefined));
+
+        if (!reopened) {
+          return "not-opened";
+        }
+
+        // The layout's window, from now on, as when a recall opens it again.
+        runInAction(() => {
+          const own = keyOfWindow(reopened);
+          const previous = keyOfWindow(saved.window);
+
+          if (own !== previous) {
+            continues.get()?.set(own, previous);
+          }
+
+          lineage.get()?.set(lineageKey(name, own), previous);
+        });
+
+        await focusWindow(reopened);
+
+        return "opened";
       },
 
       // Renaming a window, as a layout is: Enter or leaving the name keeps it, Escape the old one.

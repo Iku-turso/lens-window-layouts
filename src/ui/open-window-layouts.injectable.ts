@@ -12,10 +12,18 @@ export const openWindowLayoutsInjectable = getInjectable2({
       openModalInjectionToken.for(windowLayoutsModalKind).for(di.scopeIds),
     )();
 
-    return () => async () => {
+    // Opens the dialog, with the layout of the name given selected in it, to edit.
+    return () => async (name?: string) => {
       // The model is made as the dialog first opens, not as the status bar shows its button: what the
       // model needs failing then fails the dialog alone, not the window's frame with the button in it.
-      di.inject(windowLayoutsModelInjectable)().reset();
+      const model = di.inject(windowLayoutsModelInjectable)();
+
+      model.reset();
+
+      if (name !== undefined) {
+        void model.select(name);
+      }
+
       await openWindowLayoutsModal();
     };
   },

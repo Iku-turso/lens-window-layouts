@@ -136,12 +136,15 @@ const clamp = (value: number, min: number, max: number) =>
 // where it fits and nothing is yet; then every other window, as one whose cell another took, in the
 // first cell from the top left where it fits. A window wider than the grid is narrowed to it, and
 // one put too far right moved left to fit.
-export const placeInGrid = (
-  windows: readonly PlannedWindow[],
+// Placed by their cells alone, so that windows of a saved layout are placed as open ones are.
+type InGrid = Pick<PlannedWindow, "column" | "row" | "columns" | "rows">;
+
+export const placeInGrid = <W extends InGrid>(
+  windows: readonly W[],
   columns: number,
 ) => {
   const taken = new Set<string>();
-  const placed = new Map<PlannedWindow, PlacedWindow>();
+  const placed = new Map<W, W & { column: number; row: number }>();
   let rows = 0;
 
   const isFree = (
@@ -162,7 +165,7 @@ export const placeInGrid = (
   };
 
   const place = (
-    window: PlannedWindow,
+    window: W,
     row: number,
     column: number,
     width: number,
@@ -217,7 +220,7 @@ export const boundsInGrid = (
   area: WindowBounds,
   columns: number,
   rows: number,
-  window: PlacedWindow,
+  window: Pick<PlacedWindow, "column" | "row" | "columns" | "rows">,
 ): WindowBounds => {
   const xAt = (column: number) =>
     area.x + Math.round((column * area.width) / columns);

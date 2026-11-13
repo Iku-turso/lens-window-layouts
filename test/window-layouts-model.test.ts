@@ -7,13 +7,22 @@ import {
 import type { WindowReopening } from "@k8slens/window-layout-contracts";
 import { autorun, runInAction } from "mobx";
 import {
+  boundsInGrid,
   keyOfWindow,
+  moveInPlan,
+  type PlacedWindow,
   setColumnsInPlan,
   setRowsInPlan,
   type PlannedWindow,
 } from "../src/layouts/tiling-plan";
 import { windowLayoutsModelInjectable } from "../src/ui/window-layouts-model.injectable";
-import { createFakeLens, reopeningFor, settle, subWindowId } from "./fake-lens";
+import {
+  createFakeLens,
+  reopeningFor,
+  settle,
+  subWindowId,
+  workArea,
+} from "./fake-lens";
 
 const tilesOf = (model: ReturnType<typeof modelOf>) => {
   const plan = model.tilingPlan.resolved.get();
@@ -78,8 +87,13 @@ const withLayoutOf = async (
   await model.create();
   await settle();
   model.tilingPlan.autoTile();
+  // Tiled, as the dialog tiles them once the edit pauses, so that they are in their tiles as saved.
+  await model.tile();
   await model.saveOver("Layout 1");
   await settle();
+  // What setting up asked of Lens is none of what is tested.
+  lens.calls.focusWindow.length = 0;
+  lens.calls.placements.length = 0;
 
   return { lens, model };
 };
@@ -389,10 +403,13 @@ test("opening a window again from its tile moves no other window", async () => {
   model.dispose();
 });
 
-test("a window opened again from its tile where the layout tiled it comes back as the layout saved it", async () => {
+test("a window opened again from its tile where the layout tiled it comes back in its tile, as saved", async () => {
   const { lens, model } = await withLayoutOf([
     { id: "pods", title: "Pods", shows: reopeningFor("Pods") },
   ]);
+  const saved = model.layouts
+    .get()![0]
+    .windows.find((it) => it.title === "Pods")!.normalBounds;
 
   lens.closeWindow(subWindowId("pods"));
   await settle();
@@ -400,7 +417,7 @@ test("a window opened again from its tile where the layout tiled it comes back a
   await settle();
 
   assert.deepEqual(lens.calls.reopenWindow[0]?.placement, {
-    bounds: { x: 10, y: 10, width: 400, height: 300 },
+    bounds: saved,
     state: "normal",
     displayId: 1,
   });
@@ -649,4 +666,221 @@ test("a screen can be given more rows and columns than it would be given by itse
 
   assert.equal(screen.rows, 12);
   assert.equal(screen.columns, 10);
+});
+
+test("recalling a layout brings the windows it tiles forward, and none it does not", async () => {
+  const { lens, model } = await withLayoutOf([
+    { id: "pods", title: "Pods" },
+    { id: "logs", title: "Logs" },
+  ]);
+
+  // Logs left out of tiling.
+  model.tilingPlan.commit(
+    moveInPlan(
+      model.tilingPlan.resolved.get(),
+      keyOfWindow(subWindowId("logs")),
+      { displayId: null },
+    ),
+  );
+  await model.saveOver("Layout 1");
+  await settle();
+
+  lens.calls.focusWindow.length = 0;
+  await model.recall("Layout 1");
+  await settle();
+
+  const focused = keysOf(lens.calls.focusWindow);
+
+  assert.ok(!focused.includes(keyOfWindow(subWindowId("logs"))), "Logs left where it is");
+  assert.ok(focused.includes(keyOfWindow(subWindowId("pods"))), "Pods brought forward");
+  assert.ok(focused.includes(keyOfWindow(applicationWindowId)), "LensDev brought forward");
+});
+
+test("recalling a layout brings forward no window it tiles on a screen not connected now", async () => {
+  const saved = (id: string, title: string, isFocused = false) => ({
+    window: id === "lens" ? applicationWindowId : subWindowId(id),
+    title,
+    normalBounds: { x: 10, y: 10, width: 400, height: 300 },
+    state: "normal" as const,
+    isFocused,
+  });
+  const screen = (label: string, x: number) => ({
+    label,
+    isPrimary: x === 0,
+    bounds: { x, y: 0, width: 1200, height: 800 },
+    workArea: { x, y: 0, width: 1200, height: 800 },
+  });
+
+  const lens = createFakeLens({
+    "saved-window-layouts-2": {
+      "Layout 1": {
+        name: "Layout 1",
+        savedAt: 1,
+        windows: [
+          saved("lens", "Lens"),
+          // The window that had focus, tiled on the screen not connected now.
+          saved("pods", "Pods", true),
+          saved("logs", "Logs"),
+        ],
+        tiling: {
+          windows: [
+            { index: 0, displayId: 1, columns: 1, rows: 1 },
+            { index: 1, displayId: 2, columns: 1, rows: 1 },
+            { index: 2, displayId: null, columns: 1, rows: 1 },
+          ],
+          columns: { "1": 1, "2": 1 },
+          rows: { "1": 1, "2": 1 },
+          screens: { "1": screen("Built-in", 0), "2": screen("External", 1200) },
+        },
+      },
+    },
+  });
+
+  lens.addWindow(applicationWindowId, "Lens");
+  lens.addWindow(subWindowId("pods"), "Pods");
+  lens.addWindow(subWindowId("logs"), "Logs");
+
+  const model = modelOf(lens);
+
+  await settle();
+  await model.recall("Layout 1");
+  await settle();
+
+  assert.deepEqual(keysOf(lens.calls.focusWindow), [
+    keyOfWindow(applicationWindowId),
+  ]);
+});
+
+test("showing an open window of a layout brings it to the front", async () => {
+  const { lens, model } = await withLayoutOf([{ id: "pods", title: "Pods" }]);
+  const index = model.layouts.get()![0].windows.findIndex((it) => it.title === "Pods");
+
+  lens.calls.focusWindow.length = 0;
+
+  assert.equal(await model.showWindowOf("Layout 1", index), "focused");
+  assert.deepEqual(keysOf(lens.calls.focusWindow), [keyOfWindow(subWindowId("pods"))]);
+  assert.equal(lens.calls.reopenWindow.length, 0);
+});
+
+test("showing a window not open of a layout not shown opens it again where the layout saved it, as the layout's", async () => {
+  const { lens, model } = await withLayoutOf([
+    { id: "pods", title: "Pods", shows: reopeningFor("Pods") },
+  ]);
+  const layout = () => model.layouts.get()!.find((it) => it.name === "Layout 1")!;
+  const index = layout().windows.findIndex((it) => it.title === "Pods");
+
+  // Another layout shown in the dialog.
+  await model.create();
+  await settle();
+  lens.closeWindow(subWindowId("pods"));
+  await settle();
+  lens.calls.focusWindow.length = 0;
+
+  assert.equal(await model.showWindowOf("Layout 1", index), "opened");
+  assert.deepEqual(lens.calls.reopenWindow.map((it) => it.placement?.bounds), [
+    layout().windows[index].normalBounds,
+  ]);
+  assert.deepEqual(keysOf(lens.calls.focusWindow), [
+    keyOfWindow(subWindowId("reopened-1")),
+  ]);
+  assert.deepEqual([...model.notOpenOf(layout())], []);
+});
+
+test("showing a window not open of the layout shown opens it again from its tile", async () => {
+  const { lens, model } = await withLayoutOf([
+    { id: "pods", title: "Pods", shows: reopeningFor("Pods") },
+  ]);
+  const index = model.layouts.get()![0].windows.findIndex((it) => it.title === "Pods");
+
+  lens.closeWindow(subWindowId("pods"));
+  await settle();
+
+  assert.equal(await model.showWindowOf("Layout 1", index), "opened");
+  assert.equal(tileOf(model, "Pods").key, keyOfWindow(subWindowId("reopened-1")));
+  assert.equal(tileOf(model, "Pods").missing, undefined);
+});
+
+test("showing a window not open that Lens cannot open again tells so", async () => {
+  const { lens, model } = await withLayoutOf([{ id: "pods", title: "Pods" }]);
+  const index = model.layouts.get()![0].windows.findIndex((it) => it.title === "Pods");
+
+  await model.create();
+  await settle();
+  lens.closeWindow(subWindowId("pods"));
+  await settle();
+
+  assert.equal(await model.showWindowOf("Layout 1", index), "not-opened");
+});
+
+test("saving the tiled windows only leaves the ones not tiled out of the layout, marked not saved", async () => {
+  const { lens, model } = await withLayoutOf([
+    { id: "pods", title: "Pods" },
+    { id: "logs", title: "Logs" },
+    { id: "events", title: "Events", shows: reopeningFor("Events") },
+  ]);
+
+  // Logs and Events left out of tiling, Events closed since; saved so, both are in the layout.
+  for (const id of ["logs", "events"]) {
+    model.tilingPlan.commit(
+      moveInPlan(model.tilingPlan.resolved.get(), keyOfWindow(subWindowId(id)), {
+        displayId: null,
+      }),
+    );
+  }
+  await model.saveOver("Layout 1");
+  lens.closeWindow(subWindowId("events"));
+  await settle();
+
+  assert.equal(model.hasUntiledToLeaveOut.get(), true);
+
+  await model.saveOver("Layout 1", { tiledOnly: true });
+  await settle();
+
+  const layout = model.layouts.get()!.find((it) => it.name === "Layout 1")!;
+
+  assert.deepEqual(
+    layout.windows.map((it) => it.title).sort(),
+    ["Lens", "Pods"],
+  );
+  assert.equal(model.isOutOfPlace(tileOf(model, "Logs")), true);
+  assert.equal(model.isOutOfPlace(tileOf(model, "Events")), true);
+  assert.equal(model.isOutOfPlace(tileOf(model, "Pods")), false);
+  assert.equal(model.hasUntiledToLeaveOut.get(), false);
+});
+
+test("recalling a layout puts a window it tiles in its tile, even when saved elsewhere", async () => {
+  const { lens, model } = await withLayoutOf([{ id: "pods", title: "Pods" }]);
+  const pods = keyOfWindow(subWindowId("pods"));
+  const tile = tilesOf(model).find((it) => it.key === pods) as PlacedWindow;
+  const screen = model.tilingPlan.resolved.get().screens[0];
+  const inTile = boundsInGrid(workArea, screen.columns, screen.rows, tile);
+
+  // Moved out of its tile, and saved so.
+  runInAction(() =>
+    lens.windows
+      .find((it) => keyOfWindow(it.record.window) === pods)!
+      .bounds.set({ x: 10, y: 10, width: 400, height: 300 }),
+  );
+  await model.saveOver("Layout 1");
+  await settle();
+
+  assert.notDeepEqual(
+    model.layouts.get()![0].windows.find((it) => it.title === "Pods")!.normalBounds,
+    inTile,
+  );
+
+  lens.calls.placements.length = 0;
+  await model.recall("Layout 1");
+  await settle();
+
+  assert.deepEqual(
+    lens.calls.placements
+      .filter((it) => keyOfWindow(it.window) === pods)
+      .map((it) => it.bounds),
+    [inTile],
+  );
+
+  // In its tile, it is as saved: neither the dialog nor the hotbar's preview tells otherwise.
+  assert.equal(model.isOutOfPlace(tileOf(model, "Pods")), false);
+  assert.deepEqual([...model.notSavedOf(model.layouts.get()![0])], []);
 });

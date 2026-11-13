@@ -29,7 +29,7 @@ import {
   savedWindowLayoutsBunch,
   type SavedWindow,
 } from "./saved-window-layouts.injectable";
-import { keyOfWindow } from "./tiling-plan";
+import { boundsInGrid, keyOfWindow, resolveTilingPlan } from "./tiling-plan";
 import { fitInto, isReachableOnSomeScreen, isSameScreens } from "./screens";
 import { storedTilingPlanBunch } from "./tiling-plan.injectable";
 
@@ -194,34 +194,6 @@ export const recallWindowLayoutInjectable = getInjectable2({
           }
         }
 
-        await setWindowBounds(
-          [...matches].map(([saved, record]) => ({
-            window: record.window,
-            bounds: boundsFor(saved),
-          })),
-        );
-
-        for (const [saved, record] of matches) {
-          if (saved.state !== "normal") {
-            await setWindowState(record.window, saved.state);
-          }
-        }
-
-        // Brings every window forward but the minimized ones, which focusing would show again,
-        // the one that had focus last so it ends on top with focus.
-        const toFront = [
-          ...[...matches].map(
-            ([saved, record]) => [saved, record.window] as const,
-          ),
-          ...reopened,
-        ]
-          .filter(([saved]) => saved.state !== "minimized")
-          .sort(([a], [b]) => Number(a.isFocused) - Number(b.isFocused));
-
-        for (const [, window] of toFront) {
-          await focusWindow(window);
-        }
-
         const windowOf = new Map<SavedWindow, WindowId>([
           ...[...matches].map(
             ([saved, record]) => [saved, record.window] as const,
@@ -235,6 +207,92 @@ export const recallWindowLayoutInjectable = getInjectable2({
           windowOf,
           connected,
         );
+
+        // Where the tiling puts each window it puts in a tile, by key: on a screen connected now,
+        // as the tiling shows them. One on a screen not connected is not tiled, as the tiling says.
+        const records = await getWindowRecords();
+        const resolved = resolveTilingPlan(records, connected, plan);
+        const tileBounds = new Map(
+          resolved.screens
+            .filter((screen) => !screen.missing)
+            .flatMap((screen) =>
+              screen.windows
+                .filter((window) => !window.missing)
+                .map(
+                  (window) =>
+                    [
+                      keyOfWindow(window.record.window),
+                      boundsInGrid(
+                        screen.display.workArea.get(),
+                        screen.columns,
+                        screen.rows,
+                        window,
+                      ),
+                    ] as const,
+                ),
+            ),
+        );
+        const tiledKeys = new Set(tileBounds.keys());
+        const isTiled = (window: WindowId) =>
+          tiledKeys.has(keyOfWindow(window));
+        const stateOf = (window: WindowId) =>
+          records
+            .find((it) => keyOfWindow(it.window) === keyOfWindow(window))
+            ?.state.get();
+
+        // A tiled window shows normally to be put in its tile, as tiling does, unless the layout
+        // has it minimized.
+        for (const [saved, window] of windowOf) {
+          if (
+            isTiled(window) &&
+            saved.state !== "minimized" &&
+            stateOf(window) !== "normal"
+          ) {
+            await setWindowState(window, "normal");
+          }
+        }
+
+        // A tiled window goes in its tile; any other where the layout saved it, as one opened again
+        // was created already.
+        await setWindowBounds([
+          ...[...windowOf].flatMap(([, window]) => {
+            const bounds = tileBounds.get(keyOfWindow(window));
+
+            return bounds ? [{ window, bounds }] : [];
+          }),
+          ...[...matches]
+            .filter(([, record]) => !isTiled(record.window))
+            .map(([saved, record]) => ({
+              window: record.window,
+              bounds: boundsFor(saved),
+            })),
+        ]);
+
+        for (const [saved, window] of windowOf) {
+          if (
+            saved.state === "minimized" ||
+            (!isTiled(window) && matches.has(saved) && saved.state !== "normal")
+          ) {
+            await setWindowState(window, saved.state);
+          }
+        }
+
+        // Brings the tiled windows forward, so that they end above every other window, but the
+        // minimized ones, which focusing would show again; the one that had focus last ends on top
+        // with focus. A window not tiled is left where it is among the others. A layout saved
+        // before layouts kept a tiling tiles none: every window of it is brought forward.
+        const toFront = [...windowOf]
+          .filter(([saved]) => saved.state !== "minimized")
+          .filter(
+            ([, window]) =>
+              !layout.tiling || tiledKeys.has(keyOfWindow(window)),
+          )
+          .sort(([a], [b]) => Number(a.isFocused) - Number(b.isFocused));
+
+        for (const [, window] of toFront) {
+          await focusWindow(window);
+        }
+
         const stored = await getStoredTilingPlan();
 
         runInAction(() => {

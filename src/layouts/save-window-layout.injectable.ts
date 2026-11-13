@@ -40,10 +40,28 @@ export const saveWindowLayoutInjectable = getInjectable2({
       reopeningOfClosedWindowInjectable,
     )();
 
-    return () => async (name: string) => {
+    return () => async (
+      name: string,
+      {
+        // Whether to save only the windows in a tile, on any screen of the tiling, leaving the
+        // windows not tiled out of the layout.
+        tiledOnly = false,
+      }: { readonly tiledOnly?: boolean } = {},
+    ) => {
       const savedLayouts = await getSavedLayouts();
       const displays = await getDisplayRecords();
-      const records = await getWindowRecords();
+      const allRecords = await getWindowRecords();
+      const plan = resolveTilingPlan(
+        allRecords,
+        displays,
+        (await getStoredTilingPlan()).get() ?? undefined,
+      );
+      const tiledKeys = new Set(
+        plan.screens.flatMap((screen) => screen.windows.map((it) => it.key)),
+      );
+      const records = allRecords.filter(
+        (record) => !tiledOnly || tiledKeys.has(keyOfWindow(record.window)),
+      );
 
       const savedWindows = await Promise.all(
         records.map(async (record): Promise<SavedWindow> => {
@@ -63,14 +81,9 @@ export const saveWindowLayoutInjectable = getInjectable2({
         }),
       );
 
-      const plan = resolveTilingPlan(
-        records,
-        displays,
-        (await getStoredTilingPlan()).get() ?? undefined,
-      );
       const previous = savedLayouts.get(name);
       const openKeys = new Set(
-        records.map((record) => keyOfWindow(record.window)),
+        allRecords.map((record) => keyOfWindow(record.window)),
       );
 
       // The windows not open now, by the key their tiles go by: one of the layout's as it kept it,
@@ -94,6 +107,7 @@ export const saveWindowLayoutInjectable = getInjectable2({
           ),
         ]
           .filter(({ window }) => window.missing)
+          .filter(({ screen }) => !tiledOnly || !!screen)
           .map(
             async ({
               window,

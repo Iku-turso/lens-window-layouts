@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { applicationWindowId } from "@k8slens/messaging-contracts";
+import { runInAction } from "mobx";
 import { windowLayoutsModelInjectable } from "../src/ui/window-layouts-model.injectable";
 import { createFakeLens, settle, subWindowId } from "./fake-lens";
 
@@ -84,4 +85,96 @@ test("a hotbar that cannot be changed is told of, and the layout is renamed anyw
     ["Work"],
   );
   assert.match(model.status.get() ?? "", /^Could not change the hotbar: /);
+});
+
+test("tiling and saving into a layout not shown in the dialog tiles the windows by its own tiling, then saves them", async () => {
+  const { lens, model } = await withLayout();
+
+  model.tilingPlan.autoTile();
+  await model.saveOver("Layout 1");
+  // A second layout, every window left out of tiling, shown in the dialog.
+  await model.create();
+  await settle();
+  const tiledBefore = lens.calls.setWindowBounds;
+
+  const result = await model.tileAndSaveInto("Layout 1");
+  const layout = model.layouts.get()?.find((it) => it.name === "Layout 1");
+
+  assert.equal(result, 2);
+  assert.ok(lens.calls.setWindowBounds > tiledBefore, "the windows tiled");
+  assert.ok(
+    layout?.tiling?.windows.length &&
+      layout.tiling.windows.every((it) => it.displayId !== null),
+    "every window of Layout 1 still tiled",
+  );
+  assert.equal(model.selected.get(), "Layout 1");
+});
+
+test("tiling and saving saves a window the layout's tiling has not as not tiled", async () => {
+  const { lens, model } = await withLayout();
+
+  model.tilingPlan.autoTile();
+  await model.saveOver("Layout 1");
+  lens.addWindow(subWindowId("logs"), "Logs");
+  await settle();
+
+  await model.tileAndSaveInto("Layout 1");
+
+  const layout = model.layouts.get()?.find((it) => it.name === "Layout 1");
+  const logs = layout?.windows.findIndex((it) => it.title === "Logs");
+
+  assert.ok(logs !== undefined && logs >= 0, "Logs saved into the layout");
+  assert.equal(
+    layout?.tiling?.windows.find((it) => it.index === logs)?.displayId ?? null,
+    null,
+  );
+});
+
+test("tiling and saving into a layout there is none of saves nothing", async () => {
+  const { model } = await withLayout();
+
+  assert.equal(await model.tileAndSaveInto("Gone"), "no-layout");
+  assert.deepEqual(
+    model.layouts.get()?.map((it) => it.name),
+    ["Layout 1"],
+  );
+});
+
+test("a layout tells which of its windows are not open, also when it is not the one shown", async () => {
+  const { lens, model } = await withLayout();
+  const layout = () =>
+    model.layouts.get()!.find((it) => it.name === "Layout 1")!;
+  const preferences = () =>
+    layout().windows.findIndex((it) => it.title === "Preferences");
+
+  assert.deepEqual([...model.notOpenOf(layout())], []);
+
+  // Another layout shown in the dialog.
+  await model.create();
+  await settle();
+  lens.closeWindow(subWindowId("preferences"));
+  await settle();
+
+  assert.deepEqual([...model.notOpenOf(layout())], [preferences()]);
+});
+
+test("a layout tells which of its open windows are not where it saved them, also when it is not the one shown", async () => {
+  const { lens, model } = await withLayout();
+  const layout = () =>
+    model.layouts.get()!.find((it) => it.name === "Layout 1")!;
+  const preferences = () =>
+    layout().windows.findIndex((it) => it.title === "Preferences");
+
+  assert.deepEqual([...model.notSavedOf(layout())], []);
+
+  // Another layout shown in the dialog.
+  await model.create();
+  await settle();
+  runInAction(() =>
+    lens.windows
+      .find((it) => it.title.get() === "Preferences")!
+      .bounds.set({ x: 500, y: 500, width: 400, height: 300 }),
+  );
+
+  assert.deepEqual([...model.notSavedOf(layout())], [preferences()]);
 });

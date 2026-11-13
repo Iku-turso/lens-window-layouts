@@ -346,6 +346,7 @@ const WindowTitle = observer(({ window }: { window: PlannedWindow }) => {
   return (
     <Form
       className={styles.tileTitleForm}
+      $tooltip="Enter or clicking elsewhere keeps the name; Escape keeps the old one"
       // Not the start of dragging the window, nor of selecting text by dragging over it.
       onPointerDown={(event) => event.stopPropagation()}
       onSubmit={(event) => {
@@ -383,19 +384,21 @@ const RenameWindowButton = observer(
       return null;
     }
 
+    // The tooltip is the wrapper's, as Lens shows it, rather than the slow one of the browser.
     return (
-      <button
-        type="button"
-        className={styles.renameWindow}
-        aria-label="Rename the window"
-        title="Rename the window"
-        // Not the start of dragging the window.
-        onPointerDown={(event) => event.stopPropagation()}
-        onClick={() => model.startRenamingWindow(window)}
-      >
-        {/* Larger on a tile than on a chip of the windows not tiled. */}
-        <EditIcon $size={onTile ? "m" : "s"} />
-      </button>
+      <Span $tooltip="Rename the window: its title in Lens, kept whatever it shows">
+        <button
+          type="button"
+          className={styles.renameWindow}
+          aria-label="Rename the window"
+          // Not the start of dragging the window.
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={() => model.startRenamingWindow(window)}
+        >
+          {/* Larger on a tile than on a chip of the windows not tiled. */}
+          <EditIcon $size={onTile ? "m" : "s"} />
+        </button>
+      </Span>
     );
   },
 );
@@ -871,7 +874,13 @@ export const TilingEditor = observer(() => {
             ].join(" ")}
             $backgroundColor="backgroundSecondary"
             $border={{
-              color: isNotOpen(window) ? "critical" : "borderPrimary",
+              // As its tile would be: a window not open dashed in the critical colour, one
+              // not saved in the warning one.
+              color: isNotOpen(window)
+                ? "critical"
+                : model.isOutOfPlace(window)
+                  ? "warning"
+                  : "borderPrimary",
               width: "xxs",
               radius: "s",
             }}
@@ -881,11 +890,14 @@ export const TilingEditor = observer(() => {
           >
             <WindowTitle window={window} />
             <RenameWindowButton window={window} />
-            {window.missing
-              ? " (not open)"
-              : window.record.state.get() === "minimized"
-                ? " (minimized)"
-                : ""}
+            {/* A window not open told as its tile tells it, in the critical colour. */}
+            {window.missing ? (
+              <Span $color="critical"> not open</Span>
+            ) : window.record.state.get() === "minimized" ? (
+              " (minimized)"
+            ) : (
+              ""
+            )}
             {window.missing &&
               (model.isReopeningWindow(window) ? (
                 <SpinnerIcon
@@ -896,9 +908,6 @@ export const TilingEditor = observer(() => {
               ) : (
                 <ReopenWindowButton window={window} />
               ))}
-            {model.isOutOfPlace(window) && (
-              <Span $color="warning"> not saved</Span>
-            )}
             <CloseWindowButton window={window} inline />
           </Div>
         ))}
@@ -1102,11 +1111,6 @@ export const TilingEditor = observer(() => {
                             <ReopenWindowButton window={window} />
                           </span>
                         ))}
-                      {model.isOutOfPlace(window, screen) && (
-                        <Span className={styles.tileLabel} $color="warning">
-                          not saved
-                        </Span>
-                      )}
                     </span>
 
                     <CloseWindowButton window={window} />
