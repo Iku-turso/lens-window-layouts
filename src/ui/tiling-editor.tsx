@@ -996,8 +996,13 @@ export const TilingEditor = observer(() => {
                         row < it.row + it.rows,
                     );
 
-                    return isEmpty &&
-                      !screen.missing &&
+                    // A cell under a tile is not drawn: its outline would show around the tile,
+                    // in the tile's margin, and twice between tiles side by side.
+                    if (!isEmpty) {
+                      return null;
+                    }
+
+                    return !screen.missing &&
                       !drag &&
                       model.canOpenPlaces.get() ? (
                       <Button
