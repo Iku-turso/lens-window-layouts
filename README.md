@@ -2,6 +2,8 @@
 
 Save how the windows of Lens are arranged under a name, such as "Debugging" or "Two screens", and recall it whenever you like. A layout remembers where every window of Lens sits, the application window and every window opened from it, and whether it is maximized, minimized or full screen. Recalling a layout puts every window back where it was, opening again the ones closed since.
 
+![The Window layouts dialog: a layout named Demo tiles the main Lens window on the laptop screen, and Pods and Deployments of a cluster side by side on an external screen](https://raw.githubusercontent.com/Iku-turso/lens-window-layouts/main/assets/window-layouts-dialog.png)
+
 ## Features
 
 - Save the current arrangement of all Lens windows as a new layout with **+**. It is named "Layout 1", "Layout 2" and so on; click its name to rename it.
@@ -36,6 +38,9 @@ Arranging windows needs Lens Studio. Without it, the extension tells you that la
 - To save over a layout: select it, then click its **Save**. It saves where the windows are now and the tiling below.
 - To recall: point at a layout in the list, then click the recall button at the right end of its row.
 - To recall from the hotbar: select a layout and click the hotbar button beside its name. The layout shows in the hotbar by its initials; click it to recall the layout. Point at it to see the layout's tiling, where clicking a window brings it to the front, opening it again first when it is not open, with **Recall**, **Tile and save**, which puts the windows in their tiles by the layout's own tiling and saves them so (a window it has no tile for is saved as not tiled), and **Edit in Window layouts**, which opens the dialog with the layout selected. Click that button again, or right-click the item and choose "Remove from hotbar", to take it off.
+
+  ![Pointing at a layout in the hotbar shows its tiling across both screens, with Recall, Tile and save, and Edit in Window layouts](https://raw.githubusercontent.com/Iku-turso/lens-window-layouts/main/assets/hotbar-preview.png)
+
 - To rename: select a layout, click its name, type the new name and press Enter.
 - To delete: select a layout, then click **Delete**.
 - To tile: arrange the windows under **Tiling** in the dialog. They follow every change you make there, a moment after it. **Window Layouts: Tile windows** in the command palette tiles them as arranged too.

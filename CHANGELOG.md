@@ -2,6 +2,10 @@
 
 What changed in each version of this extension, newest first.
 
+## 0.2.1
+
+- The extension has an icon and a banner of its own, and its README shows the Window layouts dialog and the hotbar preview.
+
 ## 0.2.0
 
 - The dialog marks a window not saved by its orange outline alone, rather than with "not saved"; a window not tiled is outlined so too, as its tile would be.
